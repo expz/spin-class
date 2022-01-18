@@ -1,0 +1,248 @@
+method: bayes
+metric:
+  goal: maximize
+  name: avg_eps_len
+parameters:
+  batch_size:
+    values:
+    - 512
+    - 1024
+    - 2048
+    - 4096
+    - 8192
+  env:
+    value: CartPole-v0
+  gamma:
+    values:
+    - 0.9
+    - 0.95
+    - 0.99
+    - 0.995
+    - 0.999
+  lambda:
+    values:
+    - 0.95
+    - 0.97
+    - 0.99
+    - 0.995
+  log_step:
+    value: 8192
+  pi_layers:
+    values:
+    - - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+    - - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+    - - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+    - - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+    - - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+    - - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+    - - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+  pi_lr:
+    values:
+    - 0.4
+    - 0.1
+    - 0.04
+    - 0.01
+    - 0.004
+    - 0.001
+    - 0.0004
+  seed:
+    value: 42
+  steps:
+    value: 163840
+  vf_layers:
+    values:
+    - - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+    - - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+    - - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+    - - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+    - - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+    - - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+    - - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+  vf_lr:
+    values:
+    - 0.4
+    - 0.1
+    - 0.04
+    - 0.01
+    - 0.004
+    - 0.001
+    - 0.0004
+  vf_train_iters:
+    values:
+    - 40
+    - 80
+    - 160
+    - 320
+program: spin_class/vpg_cartpole_sweep.py
