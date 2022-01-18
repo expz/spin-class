@@ -53,6 +53,51 @@ default_config = {
         "log_step": 8192,
         "seed": 42,
     },
+    "frozenlake": {
+        "env": "FrozenLake-v1",
+        "vf_layers": [
+            ("linear", 16, "relu"),
+            ("linear", 16, "relu"),
+            ("linear", 16, "relu"),
+            ("linear", 16, "relu"),
+        ],
+        "pi_layers": [
+            ("linear", 128, "relu"),
+            ("linear", 128, "relu"),
+            ("linear", 128, "relu"),
+        ],
+        "pi_lr": 0.003,
+        "vf_lr": 0.0015,
+        "vf_train_iters": 80,
+        "gamma": 0.995,
+        "lambda": 0.95,
+        "batch_size": 1024,
+        "steps": 163840,
+        "log_step": 8192,
+        "seed": 42,
+    },
+    "halfcheetah": {
+        "env": "HalfCheetah-v2",
+        "vf_layers": [
+            ("linear", 128, "relu"),
+            ("linear", 128, "relu"),
+        ],
+        "pi_layers": [
+            ("linear", 64, "relu"),
+            ("linear", 64, "relu"),
+            ("linear", 64, "relu"),
+        ],
+        "pi_lr": 0.004,
+        "vf_lr": 0.1,
+        "vf_train_iters": 320,
+        "std_logits": -0.5,
+        "gamma": 0.995,
+        "lambda": 0.99,
+        "batch_size": 1024,
+        "steps": 163840,
+        "log_step": 8192,
+        "seed": 42,
+    },
 }
 
 

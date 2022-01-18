@@ -8,6 +8,7 @@ import torch
 from torch.distributions.categorical import Categorical
 from torch.distributions.normal import Normal
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim import Adam
 from typing import Any, Dict, List, Tuple, Union
 import wandb
@@ -15,7 +16,7 @@ import wandb
 
 def shape(space: gym.Space):
     if isinstance(space, gym.spaces.Discrete):
-        return (space.n,)
+        return tuple()
     elif isinstance(space, gym.spaces.Box):
         return space.sample().shape
     else:
@@ -32,11 +33,41 @@ class ScaleLayer1d(nn.Module):
         return torch.matmul(x, self.scale)
 
 
+class OneHot1d(nn.Module):
+    def __init__(self, num_classes: int):
+        super(OneHot1d, self).__init__()
+
+        self.num_classes = num_classes
+
+    def forward(self, x: torch.Tensor):
+        y = torch.as_tensor(x, dtype=torch.int64)
+        return F.one_hot(y, num_classes=self.num_classes).to(torch.float32)
+
+
 class VPGModel(nn.Module):
-    def __init__(self, device: torch.DeviceObjType):
+    def __init__(
+        self,
+        env: gym.Env,
+        layers: List[Tuple[str, int, str]],
+        device: torch.DeviceObjType,
+    ):
         super(VPGModel, self).__init__()
 
+        self.env = env
         self.device = device
+
+        if isinstance(env.observation_space, gym.spaces.Box):
+            self.layers = [("input", shape(env.observation_space)[0])] + layers
+        elif isinstance(env.observation_space, gym.spaces.Discrete):
+            self.layers = [
+                ("input", 1),
+                ("onehot", env.observation_space.n),
+            ] + layers
+
+        self.model = None
+
+    def forward(self, x: torch.Tensor):
+        return self.model(x)
 
     def build_model(self, conf: List[Union[Tuple[str, int], Tuple[str, int, str]]]):
         layers = []
@@ -59,6 +90,9 @@ class VPGModel(nn.Module):
             elif layer[0] == "scaling":
                 assert isinstance(layer[1], torch.Tensor)
                 layers.append(ScaleLayer1d(layer[1]))
+            elif layer[0] == "onehot":
+                size = layer[1]
+                layers.append(OneHot1d(size))
             else:
                 raise ValueError(f"Unrecognized layer type: {layer[0]}")
             prev_size = size
@@ -72,17 +106,10 @@ class VPGValueModel(VPGModel):
         layers: List[Tuple[str, int, str]],
         device: torch.DeviceObjType,
     ):
-        super(VPGValueModel, self).__init__(device)
+        super(VPGValueModel, self).__init__(env, layers, device)
 
-        all_layers = (
-            [("input", shape(env.observation_space)[0])]
-            + layers
-            + [("linear", 1, "none")]
-        )
-        self.model = self.build_model(all_layers)
-
-    def forward(self, x):
-        return self.model(x)
+        self.layers += [("linear", 1, "none")]
+        self.model = self.build_model(self.layers)
 
 
 class VPGPolicyModel(VPGModel):
@@ -92,15 +119,7 @@ class VPGPolicyModel(VPGModel):
         layers: List[Tuple[str, int, str]],
         device: torch.DeviceObjType,
     ):
-        super(VPGPolicyModel, self).__init__(device)
-
-        self.env = env
-        self.layers = [("input", shape(env.observation_space)[0])] + layers
-
-        self.model = None
-
-    def forward(self, x):
-        return self.model(x)
+        super(VPGPolicyModel, self).__init__(env, layers, device)
 
 
 class VPGGaussianPolicyModel(VPGPolicyModel):
@@ -161,6 +180,7 @@ class VPGCategoricalPolicyModel(VPGPolicyModel):
         output_layers = [("linear", env.action_space.n, "none")]
         self.layers += output_layers
         self.model = self.build_model(self.layers)
+        print(self.model)
 
     def distribution(self, output: torch.Tensor):
         return Categorical(logits=output)
@@ -214,7 +234,9 @@ def train(
     for k in range(0, config["steps"], batch_size):
         done = False
         obs = env.reset()
-        obss = np.zeros([batch_size, 4])
+        obss = np.zeros([batch_size] + list(shape(env.observation_space)))
+        if len(obss.shape) == 1:
+            obss = np.expand_dims(obss, axis=1)
         rets = torch.zeros(batch_size, dtype=torch.float32, device=device)
         advs = torch.zeros(batch_size, dtype=torch.float32, device=device)
         as_ = torch.zeros(batch_size, dtype=torch.float32, device=device)
@@ -225,14 +247,19 @@ def train(
         ptr = 0
         eps_lens = []
         eps_len = 0
+        total_rews = []
+        total_rew = 0
         for i in range(batch_size):
             eps_len += 1
 
             obss[i, :] = obs
 
             with torch.no_grad():
-                p = pi(torch.as_tensor(obs, dtype=torch.float32, device=device))
-                v = vf(torch.as_tensor(obs, dtype=torch.float32, device=device))
+                obs_t = torch.as_tensor(
+                    obs, dtype=torch.float32, device=device
+                ).unsqueeze(0)
+                p = pi(obs_t)[0]
+                v = vf(obs_t)[0]
                 dist = pi.distribution(p)
                 a = dist.sample()
                 obs, r, done, _ = env.step(a.item())
@@ -242,9 +269,12 @@ def train(
             eps_rs[eps_len - 1] = r
             rs[i] = r
 
+            total_rew += r
+
             if done or i == batch_size - 1:
                 if done:
                     eps_lens.append(eps_len)
+                    total_rews.append(total_rew)
                 ret = 0
                 for i in range(eps_len - 1, -1, -1):
                     ret = eps_rs[i] + gamma * ret
@@ -259,10 +289,15 @@ def train(
                 ptr += eps_len
                 done = False
                 eps_len = 0
+                total_rew = 0
                 obs = env.reset()
 
         step = k + batch_size
 
+        avg_total_rew = sum(total_rews) / len(total_rews)
+        max_total_rew = max(total_rews)
+        min_total_rew = min(total_rews)
+        std_total_rew = np.std(total_rews).tolist()
         avg_eps_len = sum(eps_lens) / len(eps_lens)
         max_eps_len = max(eps_lens)
         min_eps_len = min(eps_lens)
@@ -294,6 +329,7 @@ def train(
         adv_b = (adv_b - mean) / std
 
         pi_opt.zero_grad()
+
         logp_b = pi.distribution(pi(obs_b)).log_prob(a_b)
         pi_loss = -(logp_b * adv_b).mean()
         pi_loss.backward()
@@ -309,6 +345,10 @@ def train(
         if step % config["log_step"] == 0:
             wandb.log(
                 {
+                    "avg_total_rew": avg_total_rew,
+                    "max_total_rew": max_total_rew,
+                    "min_total_rew": min_total_rew,
+                    "std_total_rew": std_total_rew,
                     "avg_eps_len": avg_eps_len,
                     "max_eps_len": max_eps_len,
                     "min_eps_len": min_eps_len,
@@ -322,5 +362,5 @@ def train(
             )
 
         print(
-            f"steps: {step}, avg eps length: {avg_eps_len:.2f}, min eps length: {min_eps_len}, pi loss: {pi_loss.item():.6f}, vf_loss: {vf_loss:.6f}"
+            f"steps: {step}, avg total rew: {avg_total_rew:.4f}, avg eps length: {avg_eps_len:.2f}, min eps length: {min_eps_len}, pi loss: {pi_loss.item():.6f}, vf_loss: {vf_loss:.6f}"
         )
