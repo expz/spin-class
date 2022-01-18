@@ -21,6 +21,7 @@ default_config = {
     "pi_lr": 0.003,
     "vf_lr": 0.0015,
     "vf_train_iters": 80,
+    "std_logits": -0.5,
     "gamma": 0.995,
     "lambda": 0.95,
     "batch_size": 1024,

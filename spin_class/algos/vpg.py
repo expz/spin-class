@@ -86,9 +86,6 @@ class VPGValueModel(VPGModel):
 
 
 class VPGPolicyModel(VPGModel):
-    BOX = 0
-    DISCRETE = 1
-
     def __init__(
         self,
         env: gym.Env,
@@ -97,50 +94,76 @@ class VPGPolicyModel(VPGModel):
     ):
         super(VPGPolicyModel, self).__init__(device)
 
-        if isinstance(env.action_space, gym.spaces.Box):
-            self.env_type = self.BOX
-            signal_count = env.action_space.shape[0]
-            self.std = torch.exp(
-                -0.5 * torch.ones((signal_count,), dtype=torch.float32, device=device)
-            )
-            signal_scale = torch.as_tensor(
-                (env.action_space.high - env.action_space.low) / 2.0,
-                dtype=torch.float32,
-                device=device,
-            )
-            output_layers = [("linear", signal_count, "tanh")]
-            if not torch.all(
-                torch.isclose(signal_scale, torch.ones_like(signal_scale))
-            ):
-                output_layers.append(("scaling", signal_scale))
-            if not np.all(
-                np.isclose(env.action_space.high, -env.action_space.low, equal_nan=True)
-            ):
-                # TODO: add offset layer.
-                raise NotImplementedError(
-                    "Box ranges which are not centered at 0 are not yet implemented."
-                )
-        elif isinstance(env.action_space, gym.spaces.Discrete):
-            self.env_type = self.DISCRETE
-            output_layers = [("linear", env.action_space.n, "none")]
-        else:
-            raise NotImplementedError(
-                f"Unsupported gym space type: {type(env.action_space)}"
-            )
+        self.env = env
+        self.layers = [("input", shape(env.observation_space)[0])] + layers
 
-        all_layers = (
-            [("input", shape(env.observation_space)[0])] + layers + output_layers
-        )
-        self.model = self.build_model(all_layers)
-
-    def distribution(self, output: torch.Tensor):
-        if self.env_type == self.BOX:
-            return Normal(output, self.std)
-        elif self.env_type == self.DISCRETE:
-            return Categorical(logits=output)
+        self.model = None
 
     def forward(self, x):
         return self.model(x)
+
+
+class VPGGaussianPolicyModel(VPGPolicyModel):
+    def __init__(
+        self,
+        env: gym.Env,
+        layers: List[Tuple[str, int, str]],
+        std_logits: float,
+        device: torch.torch.DeviceObjType,
+    ):
+        super(VPGGaussianPolicyModel, self).__init__(env, layers, device)
+
+        assert isinstance(env.action_space, gym.spaces.Box)
+
+        signal_count = env.action_space.shape[0]
+
+        output_layers = [("linear", signal_count, "tanh")]
+
+        # TOOD: Support infinite sized boxes.
+        signal_scale = torch.as_tensor(
+            (env.action_space.high - env.action_space.low) / 2.0,
+            dtype=torch.float32,
+            device=device,
+        )
+        if not torch.all(torch.isclose(signal_scale, torch.ones_like(signal_scale))):
+            output_layers.append(("scaling", signal_scale))
+
+        if not np.all(
+            np.isclose(env.action_space.high, -env.action_space.low, equal_nan=True)
+        ):
+            # TODO: add offset layer.
+            raise NotImplementedError(
+                "Box ranges which are not centered at 0 are not yet implemented."
+            )
+
+        self.layers += output_layers
+        self.model = self.build_model(self.layers)
+
+        self.std = torch.exp(
+            std_logits * torch.ones((signal_count,), dtype=torch.float32, device=device)
+        )
+
+    def distribution(self, output: torch.Tensor):
+        return Normal(output, self.std)
+
+
+class VPGCategoricalPolicyModel(VPGPolicyModel):
+    def __init__(
+        self,
+        env: gym.Env,
+        layers: List[Tuple[str, int, str]],
+        device: torch.torch.DeviceObjType,
+    ):
+        super(VPGCategoricalPolicyModel, self).__init__(env, layers, device)
+
+        assert isinstance(env.action_space, gym.spaces.Discrete)
+
+        output_layers = [("linear", env.action_space.n, "none")]
+        self.layers += output_layers
+        self.model = self.build_model(self.layers)
+
+    def distribution(self, output: torch.Tensor):
+        return Categorical(logits=output)
 
 
 def train(
@@ -160,7 +183,16 @@ def train(
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    pi = VPGPolicyModel(env, config["pi_layers"], device)
+    if isinstance(env.action_space, gym.spaces.Box):
+        pi = VPGGaussianPolicyModel(
+            env, config["pi_layers"], config["std_logits"], device
+        )
+    elif isinstance(env.action_space, gym.spaces.Discrete):
+        pi = VPGCategoricalPolicyModel(env, config["pi_layers"], device)
+    else:
+        raise NotImplementedError(
+            f"Action space type not yet supported: {type(env.action_space)}"
+        )
     vf = VPGValueModel(env, config["vf_layers"], device)
 
     wandb.watch(pi)
