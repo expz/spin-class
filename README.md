@@ -11,19 +11,29 @@ This code uses [Weights and Biases](https://wandb.ai/site) to track experiments.
 ### Prerequisites
 
 * Ubuntu 18.04 (presumably works on 20.04 and 22.04)
-* Python 3.8
-* pip
-* virtualenv
-* Nvidia GPU
+* Nvidia GPU (TODO: remove this requirement)
+
+#### Install general prerequisites
+
+```bash
+sudo apt-get install -y \
+    git \
+    python3.8 \
+    python3.8-dev \
+    python3.8-distutils \
+    python3.8-venv \
+    python3-pip
+```
 
 ### Install Mujoco
 
 Mujoco is required for the InvertedPendulum-v2 and HalfCheetah-v2 environments.
 
-#### Install prerequisites for Mujoco
+#### Install Mujoco prequisites
 
 ```bash
 sudo apt-get install -y \
+    curl \
     libgl1-mesa-dev \
     libgl1-mesa-glx \
     libglew-dev \
@@ -31,10 +41,12 @@ sudo apt-get install -y \
     libosmesa6-dev \
     net-tools \
     software-properties-common \
+    virtualenv \
+    wget \
     xpra \
     xserver-org-dev
 
-sudo curl -o /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-sci-artifacts/manual-builds/patchelf_0.9_amd64.elf \
+sudo wget -o /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-sci-artifacts/manual-builds/patchelf_0.9_amd64.elf \
   && sudo chmod a+x /usr/local/bin/patchelf
 ```
 
