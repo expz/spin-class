@@ -105,20 +105,22 @@ wandb login
 
 This is implemented for CartPole-v0 and InvertedPendulum-v2.
 
+__You must create projects `vpg-cartpole` and `vpg-invertedpendulum` in the Weights and Biases UI for this to work.__
+
 #### Run reproducibility test
 
 This runs the same algorithm with the same settings with different random seeds to test how consistent its performance is. From the root directory of this repository run
 
 ```bash
 source venv/bin/activate
-python spin_class/vpg_cartpole_reproducibility.py
+python spin_class/vpg_reproducibility.py --env cartpole
 ```
 
 for CartPole-v0 or
 
 ```bash
 source venv/bin/activate
-python spin_class/vpg_invpen_reproducibility.py
+python spin_class/vpg_reproducibility.py --env invertedpendulum
 ```
 
 for InvertedPendulum-v2.
