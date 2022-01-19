@@ -22,7 +22,9 @@ sudo apt-get install -y \
     python3.8-dev \
     python3.8-distutils \
     python3.8-venv \
-    python3-pip
+    python3-pip \
+    swig \
+    swig3.0
 ```
 
 ### Install Mujoco
