@@ -1,82 +1,90 @@
 method: bayes
 metric:
   goal: maximize
-  name: avg_eps_len
+  name: max_avg_eps_rew
 parameters:
   batch_size:
     values:
-    - 512
     - 1024
     - 2048
     - 4096
     - 8192
-  env:
-    value: InvertedPendulum-v2
   gamma:
-    values:
-    - 0.9
-    - 0.95
-    - 0.99
-    - 0.995
-    - 0.999
+    min: 0.9
+    max: 0.999
   lambda:
-    values:
-    - 0.95
-    - 0.97
-    - 0.99
-    - 0.995
-  std_logits:
-    value: -0.5
+    value: 0.97
   log_step:
     value: 8192
   pi_layers:
     values:
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-    - - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-    - - - linear
+    - - - embed
         - 16
+        - 8
+      - - linear
+        - 32
         - relu
       - - linear
+        - 32
+        - relu
+    - - - embed
         - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
+        - 8
       - - linear
         - 64
         - relu
       - - linear
         - 64
         - relu
-    - - - linear
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
         - 128
         - relu
       - - linear
@@ -85,7 +93,10 @@ parameters:
       - - linear
         - 128
         - relu
-    - - - linear
+    - - - embed
+        - 16
+        - 8
+      - - linear
         - 16
         - relu
       - - linear
@@ -97,9 +108,9 @@ parameters:
       - - linear
         - 16
         - relu
-    - - - linear
-        - 32
-        - relu
+    - - - embed
+        - 16
+        - 8
       - - linear
         - 32
         - relu
@@ -109,7 +120,13 @@ parameters:
       - - linear
         - 32
         - relu
-    - - - linear
+      - - linear
+        - 32
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
         - 16
         - relu
       - - linear
@@ -125,66 +142,82 @@ parameters:
         - 16
         - relu
   pi_lr:
-    values:
-    - 0.4
-    - 0.1
-    - 0.04
-    - 0.01
-    - 0.004
-    - 0.001
-    - 0.0004
+    distribution: log_uniform
+    min: -9.21034
+    max: -0.91629
   seed:
     value: 42
   steps:
     value: 163840
   vf_layers:
     values:
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-    - - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-    - - - linear
+    - - - embed
         - 16
+        - 8
+      - - linear
+        - 32
         - relu
       - - linear
+        - 32
+        - relu
+    - - - embed
         - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
+        - 8
       - - linear
         - 64
         - relu
       - - linear
         - 64
         - relu
-    - - - linear
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 128
+        - relu
+      - - linear
+        - 128
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+      - - linear
+        - 16
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+      - - linear
+        - 32
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+      - - linear
+        - 64
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
         - 128
         - relu
       - - linear
@@ -193,7 +226,22 @@ parameters:
       - - linear
         - 128
         - relu
-    - - - linear
+    - - - embed
+        - 16
+        - 8
+      - - linear
+        - 256
+        - relu
+      - - linear
+        - 256
+        - relu
+      - - linear
+        - 256
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
         - 16
         - relu
       - - linear
@@ -205,9 +253,9 @@ parameters:
       - - linear
         - 16
         - relu
-    - - - linear
-        - 32
-        - relu
+    - - - embed
+        - 16
+        - 8
       - - linear
         - 32
         - relu
@@ -217,7 +265,13 @@ parameters:
       - - linear
         - 32
         - relu
-    - - - linear
+      - - linear
+        - 32
+        - relu
+    - - - embed
+        - 16
+        - 8
+      - - linear
         - 16
         - relu
       - - linear
@@ -233,18 +287,18 @@ parameters:
         - 16
         - relu
   vf_lr:
-    values:
-    - 0.4
-    - 0.1
-    - 0.04
-    - 0.01
-    - 0.004
-    - 0.001
-    - 0.0004
+    distribution: log_uniform
+    min: -9.21034
+    max: -0.91629
   vf_train_iters:
-    values:
-    - 40
-    - 80
-    - 160
-    - 320
-program: spin_class/vpg_invpen_sweep.py
+    distribution: int_uniform
+    min: 20
+    max: 320
+program: spin_class/vpg_sweep.py
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - "--env"
+  - "frozenlake"
+  - "${args}"

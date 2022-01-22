@@ -61,7 +61,6 @@ class VPGModel(nn.Module):
         elif isinstance(env.observation_space, gym.spaces.Discrete):
             self.layers = [
                 ("input", 1),
-                ("onehot", env.observation_space.n),
             ] + layers
 
         self.model = None
@@ -93,6 +92,18 @@ class VPGModel(nn.Module):
             elif layer[0] == "onehot":
                 size = layer[1]
                 layers.append(OneHot1d(size))
+            elif layer[0] == "embed":
+                num_classes = layer[1]
+                size = layer[2]
+                layers.append(
+                    nn.Embedding(
+                        num_classes,
+                        size,
+                        sparse=False,
+                        dtype=torch.float32,
+                        device=self.device,
+                    )
+                )
             else:
                 raise ValueError(f"Unrecognized layer type: {layer[0]}")
             prev_size = size
@@ -180,7 +191,6 @@ class VPGCategoricalPolicyModel(VPGPolicyModel):
         output_layers = [("linear", env.action_space.n, "none")]
         self.layers += output_layers
         self.model = self.build_model(self.layers)
-        print(self.model)
 
     def distribution(self, output: torch.Tensor):
         return Categorical(logits=output)
@@ -221,11 +231,19 @@ def train(
     pi_opt = Adam(pi.parameters(), lr=config["pi_lr"])
     vf_opt = Adam(vf.parameters(), lr=config["vf_lr"])
 
+    save_max_eps = config["save_max_eps"]
     gamma = config["gamma"]
     lam = config["lambda"]
     batch_size = config["batch_size"]
     avg_eps_len = 0
+    max_avg_eps_rew = float("-inf")
     max_performance = False
+    epsilon = 1e-6
+    obs_dtype = (
+        torch.int64
+        if isinstance(env.observation_space, gym.spaces.Discrete)
+        else torch.float32
+    )
 
     model_dir = f"models/vpg/{env.spec.id.lower()}"
     os.makedirs(f"{model_dir}/pi", mode=0o755, exist_ok=True)
@@ -255,9 +273,9 @@ def train(
             obss[i, :] = obs
 
             with torch.no_grad():
-                obs_t = torch.as_tensor(
-                    obs, dtype=torch.float32, device=device
-                ).unsqueeze(0)
+                obs_t = torch.as_tensor(obs, dtype=obs_dtype, device=device).unsqueeze(
+                    0
+                )
                 p = pi(obs_t)[0]
                 v = vf(obs_t)[0]
                 dist = pi.distribution(p)
@@ -294,50 +312,54 @@ def train(
 
         step = k + batch_size
 
-        avg_total_rew = sum(total_rews) / len(total_rews)
-        max_total_rew = max(total_rews)
-        min_total_rew = min(total_rews)
-        std_total_rew = np.std(total_rews).tolist()
+        avg_eps_rew = sum(total_rews) / len(total_rews)
+        max_eps_rew = max(total_rews)
+        min_eps_rew = min(total_rews)
+        std_eps_rew = np.std(total_rews).tolist()
+        max_avg_eps_rew = max(max_avg_eps_rew, avg_eps_rew)
         avg_eps_len = sum(eps_lens) / len(eps_lens)
         max_eps_len = max(eps_lens)
         min_eps_len = min(eps_lens)
         std_eps_len = np.std(eps_lens).tolist()
 
         # Save models whenever max performance is reached
-        if int(min_eps_len) == int(env.spec.max_episode_steps):
-            if not max_performance:
-                dt_str = datetime.now().strftime("%Y%m%dT%H%M%S")
-                state = {
-                    "config": config,
-                    "pi_state_dict": pi.state_dict(),
-                    "vf_state_dict": vf.state_dict(),
-                }
-                torch.save(
-                    state,
-                    f"{model_dir}/{run_name}_{run_id}_{step}_{dt_str}.pth",
-                )
-            max_performance = True
-        else:
-            max_performance = False
+        if save_max_eps:
+            if int(min_eps_len) == int(env.spec.max_episode_steps):
+                if not max_performance:
+                    dt_str = datetime.now().strftime("%Y%m%dT%H%M%S")
+                    state = {
+                        "config": config,
+                        "pi_state_dict": pi.state_dict(),
+                        "vf_state_dict": vf.state_dict(),
+                    }
+                    torch.save(
+                        state,
+                        f"{model_dir}/{run_name}_{run_id}_{step}_{dt_str}.pth",
+                    )
+                max_performance = True
+            else:
+                max_performance = False
 
-        obs_b = torch.as_tensor(obss, dtype=torch.float32, device=device)
+        obs_b = torch.as_tensor(obss.squeeze(), dtype=obs_dtype, device=device)
         a_b = as_
         ret_b = rets
 
         adv_b = advs
         std, mean = adv_b.std(dim=0), adv_b.mean()
-        adv_b = (adv_b - mean) / std
+        adv_b = (adv_b - mean) / (std + epsilon)
 
         pi_opt.zero_grad()
 
-        logp_b = pi.distribution(pi(obs_b)).log_prob(a_b)
+        dist = pi.distribution(pi(obs_b))
+        avg_entropy = dist.entropy().sum() / obs_b.shape[0]
+        logp_b = dist.log_prob(a_b)
         pi_loss = -(logp_b * adv_b).mean()
         pi_loss.backward()
         pi_opt.step()
 
         for i in range(config["vf_train_iters"]):
             vf_opt.zero_grad()
-            v_b = vf(obs_b)
+            v_b = vf(obs_b).squeeze()
             vf_loss = ((v_b - ret_b) ** 2).mean()
             vf_loss.backward()
             vf_opt.step()
@@ -345,10 +367,12 @@ def train(
         if step % config["log_step"] == 0:
             wandb.log(
                 {
-                    "avg_total_rew": avg_total_rew,
-                    "max_total_rew": max_total_rew,
-                    "min_total_rew": min_total_rew,
-                    "std_total_rew": std_total_rew,
+                    "avg_entropy": avg_entropy.item(),
+                    "avg_eps_rew": avg_eps_rew,
+                    "max_eps_rew": max_eps_rew,
+                    "min_eps_rew": min_eps_rew,
+                    "std_eps_rew": std_eps_rew,
+                    "max_avg_eps_rew": max_avg_eps_rew,
                     "avg_eps_len": avg_eps_len,
                     "max_eps_len": max_eps_len,
                     "min_eps_len": min_eps_len,
@@ -362,5 +386,15 @@ def train(
             )
 
         print(
-            f"steps: {step}, avg total rew: {avg_total_rew:.4f}, avg eps length: {avg_eps_len:.2f}, min eps length: {min_eps_len}, pi loss: {pi_loss.item():.6f}, vf_loss: {vf_loss:.6f}"
+            ", ".join(
+                [
+                    f"steps: {step}",
+                    f"avg total rew: {avg_eps_rew:.4f}",
+                    f"entropy: {avg_entropy.item():.4f}",
+                    f"avg eps length: {avg_eps_len:.2f}",
+                    f"min eps length: {min_eps_len}",
+                    f"pi loss: {pi_loss.item():.6f}",
+                    f"vf_loss: {vf_loss:.6f}",
+                ]
+            )
         )
