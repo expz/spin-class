@@ -398,3 +398,7 @@ def train(
                 ]
             )
         )
+
+        if np.isclose(avg_entropy.item(), 0.0):
+            print("Stopping early: entropy has gone to zero.")
+            break
