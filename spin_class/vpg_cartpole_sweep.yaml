@@ -9,216 +9,46 @@ parameters:
     - 1024
     - 2048
     - 4096
-    - 8192
   gamma:
-    min: 0.9
-    max: 0.999
+    distribution: log_uniform
+    min: -0.10537  # 0.9
+    max: -0.00101  # 0.999
   lambda:
     value: 0.97
   log_step:
-    value: 8192
-  pi_layers:
-    values:
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-    - - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-    - - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-    - - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-    - - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
+    value: 4096
+  pi_num_layers:
+    distribution: int_uniform
+    min: 2
+    max: 6
+  pi_layer_size:
+    distribution: log_uniform
+    min: 2.77259  # 16
+    max: 4.85204  # 128
+  pi_activation:
+    value: relu
   pi_lr:
     distribution: log_uniform
-    min: -9.21034
-    max: -0.91629
+    min: -9.21034  # 0.0001
+    max: -0.91629  # 0.4
   seed:
     value: 42
   steps:
-    value: 163840
-  vf_layers:
-    values:
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-    - - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-    - - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-      - - linear
-        - 64
-        - relu
-    - - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-      - - linear
-        - 128
-        - relu
-    - - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-    - - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-      - - linear
-        - 32
-        - relu
-    - - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
-      - - linear
-        - 16
-        - relu
+    value: 81920
+  vf_num_layers:
+    distribution: int_uniform
+    min: 2
+    max: 6
+  vf_layer_size:
+    distribution: log_uniform
+    min: 2.77259  # 16
+    max: 4.85204  # 128
+  vf_activation:
+    value: relu
   vf_lr:
     distribution: log_uniform
-    min: -9.21034
-    max: -0.91629
+    min: -9.21034  # 0.0001
+    max: -0.91629  # 0.4
   vf_train_iters:
     distribution: int_uniform
     min: 20

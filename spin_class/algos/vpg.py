@@ -1,4 +1,5 @@
 from datetime import datetime
+from re import A
 import gym
 import gym.spaces
 import numpy as np
@@ -13,6 +14,8 @@ from torch.optim import Adam
 from typing import Any, Dict, List, Tuple, Union
 import wandb
 
+import spin_class.utils as utils
+
 
 def shape(space: gym.Space):
     if isinstance(space, gym.spaces.Discrete):
@@ -21,6 +24,76 @@ def shape(space: gym.Space):
         return space.sample().shape
     else:
         raise Exception(f"Unsupported space type: {type(space)}")
+
+
+def build_model(
+    conf: List[Union[Tuple[str, int], Tuple[str, int, str]]],
+    device: torch.DeviceObjType,
+):
+    layers = []
+    t, prev_size, *_ = conf[0]
+    assert t == "input"
+    if len(conf) == 1:
+        layers.append(nn.Identity())
+    for layer in conf[1:]:
+        if layer[0] == "linear":
+            size = layer[1]
+            layers.append(nn.Linear(prev_size, size))
+            if layer[2] == "relu":
+                layers.append(nn.ReLU())
+            elif layer[2] == "none":
+                pass
+            elif layer[2] == "tanh":
+                layers.append(nn.Tanh())
+            else:
+                raise NotImplementedError(f"Unrecognized activation type: {layer[2]}")
+        elif layer[0] == "scaling":
+            assert isinstance(layer[1], torch.Tensor)
+            layers.append(ScaleLayer1d(layer[1]))
+        elif layer[0] == "onehot":
+            size = layer[1]
+            layers.append(OneHot1d(size))
+        elif layer[0] == "embed":
+            num_classes = layer[1]
+            size = layer[2]
+            layers.append(
+                nn.Embedding(
+                    num_classes,
+                    size,
+                    sparse=False,
+                    dtype=torch.float32,
+                    device=device,
+                )
+            )
+        else:
+            raise ValueError(f"Unrecognized layer type: {layer[0]}")
+        prev_size = size
+    return nn.Sequential(*layers).to(device)
+
+
+def gaussian_output_layers(env: gym.Env, device: torch.DeviceObjType):
+    signal_count = env.action_space.shape[0]
+
+    output_layers = [("linear", signal_count, "tanh")]
+
+    # TOOD: Support infinite sized boxes.
+    signal_scale = torch.as_tensor(
+        (env.action_space.high - env.action_space.low) / 2.0,
+        dtype=torch.float32,
+        device=device,
+    )
+    if not torch.all(torch.isclose(signal_scale, torch.ones_like(signal_scale))):
+        output_layers.append(("scaling", signal_scale))
+
+    if not np.all(
+        np.isclose(env.action_space.high, -env.action_space.low, equal_nan=True)
+    ):
+        # TODO: add offset layer.
+        raise NotImplementedError(
+            "Box ranges which are not centered at 0 are not yet implemented."
+        )
+
+    return output_layers
 
 
 class ScaleLayer1d(nn.Module):
@@ -55,145 +128,271 @@ class VPGModel(nn.Module):
 
         self.env = env
         self.device = device
-
-        if isinstance(env.observation_space, gym.spaces.Box):
-            self.layers = [("input", shape(env.observation_space)[0])] + layers
-        elif isinstance(env.observation_space, gym.spaces.Discrete):
-            self.layers = [
-                ("input", 1),
-            ] + layers
-
-        self.model = None
+        self.layers = layers
+        self.head = build_model(layers, device)
 
     def forward(self, x: torch.Tensor):
-        return self.model(x)
+        return self.head(x)
 
-    def build_model(self, conf: List[Union[Tuple[str, int], Tuple[str, int, str]]]):
-        layers = []
-        t, prev_size = conf[0]
-        assert t == "input"
-        for layer in conf[1:]:
-            if layer[0] == "linear":
-                size = layer[1]
-                layers.append(nn.Linear(prev_size, size))
-                if layer[2] == "relu":
-                    layers.append(nn.ReLU())
-                elif layer[2] == "none":
-                    pass
-                elif layer[2] == "tanh":
-                    layers.append(nn.Tanh())
-                else:
-                    raise NotImplementedError(
-                        f"Unrecognized activation type: {layer[2]}"
-                    )
-            elif layer[0] == "scaling":
-                assert isinstance(layer[1], torch.Tensor)
-                layers.append(ScaleLayer1d(layer[1]))
-            elif layer[0] == "onehot":
-                size = layer[1]
-                layers.append(OneHot1d(size))
-            elif layer[0] == "embed":
-                num_classes = layer[1]
-                size = layer[2]
-                layers.append(
-                    nn.Embedding(
-                        num_classes,
-                        size,
-                        sparse=False,
-                        dtype=torch.float32,
-                        device=self.device,
-                    )
-                )
+
+class VPGTrunkMLP(VPGModel):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_layers: int,
+        layer_size: int,
+        activation: str,
+        device: torch.DeviceObjType,
+        embed_size: int = 0,
+    ):
+        if isinstance(env.observation_space, gym.spaces.Box):
+            layers = [("input", shape(env.observation_space)[0])]
+        elif isinstance(env.observation_space, gym.spaces.Discrete):
+            if embed_size > 0:
+                layers = [("embed", env.observation_space.n, embed_size)]
             else:
-                raise ValueError(f"Unrecognized layer type: {layer[0]}")
-            prev_size = size
-        return nn.Sequential(*layers).to(self.device)
+                layers = [("onehot", env.observation_space.n)]
+            layers = [("input", 1)] + layers
+        layers += [("linear", layer_size, activation)] * num_layers
+
+        super(VPGTrunkMLP, self).__init__(env, layers, device)
+
+        self.output_size = layer_size
 
 
-class VPGValueModel(VPGModel):
+class VPGValueMLP(VPGModel):
     def __init__(
         self,
         env: gym.Env,
-        layers: List[Tuple[str, int, str]],
+        num_layers: int,
+        layer_size: int,
+        activation: str,
+        device: torch.DeviceObjType,
+        embed_size: int = 0,
+    ):
+        layers = [("input", layer_size), ("linear", 1, "none")]
+        super(VPGValueMLP, self).__init__(env, layers, device)
+
+        self.trunk = VPGTrunkMLP(
+            env, num_layers, layer_size, activation, device, embed_size
+        )
+
+    def forward(self, x: torch.tensor):
+        return self.head(self.trunk(x))
+
+
+class VPGValueMLPHead(VPGModel):
+    def __init__(
+        self,
+        env: gym.Env,
+        trunk: VPGTrunkMLP,
+        num_layers: int,
+        layer_size: int,
+        activation: str,
         device: torch.DeviceObjType,
     ):
-        super(VPGValueModel, self).__init__(env, layers, device)
+        layers = [("input", trunk.output_size)]
+        layers += [("linear", layer_size, activation)] * num_layers
+        layers += [("linear", 1, "none")]
+        super(VPGValueMLPHead, self).__init__(env, layers, device)
 
-        self.layers += [("linear", 1, "none")]
-        self.model = self.build_model(self.layers)
+        self.trunk = trunk
+
+    def forward(self, x: torch.tensor):
+        return self.head(self.trunk(x))
 
 
-class VPGPolicyModel(VPGModel):
+class VPGGaussianPolicyMLP(VPGModel):
     def __init__(
         self,
         env: gym.Env,
-        layers: List[Tuple[str, int, str]],
+        num_layers: int,
+        layer_size: int,
+        activation: str,
         device: torch.DeviceObjType,
+        std_logits: float = -0.5,
+        embed_size: int = 0,
     ):
-        super(VPGPolicyModel, self).__init__(env, layers, device)
-
-
-class VPGGaussianPolicyModel(VPGPolicyModel):
-    def __init__(
-        self,
-        env: gym.Env,
-        layers: List[Tuple[str, int, str]],
-        std_logits: float,
-        device: torch.torch.DeviceObjType,
-    ):
-        super(VPGGaussianPolicyModel, self).__init__(env, layers, device)
-
         assert isinstance(env.action_space, gym.spaces.Box)
 
+        output_layers = [("input", layer_size)]
+        output_layers += gaussian_output_layers(env, device)
+        super(VPGGaussianPolicyMLP, self).__init__(env, output_layers, device)
+
         signal_count = env.action_space.shape[0]
-
-        output_layers = [("linear", signal_count, "tanh")]
-
-        # TOOD: Support infinite sized boxes.
-        signal_scale = torch.as_tensor(
-            (env.action_space.high - env.action_space.low) / 2.0,
-            dtype=torch.float32,
-            device=device,
-        )
-        if not torch.all(torch.isclose(signal_scale, torch.ones_like(signal_scale))):
-            output_layers.append(("scaling", signal_scale))
-
-        if not np.all(
-            np.isclose(env.action_space.high, -env.action_space.low, equal_nan=True)
-        ):
-            # TODO: add offset layer.
-            raise NotImplementedError(
-                "Box ranges which are not centered at 0 are not yet implemented."
-            )
-
-        self.layers += output_layers
-        self.model = self.build_model(self.layers)
-
         self.std = torch.exp(
             std_logits * torch.ones((signal_count,), dtype=torch.float32, device=device)
         )
+
+        self.trunk = VPGTrunkMLP(
+            env, num_layers, layer_size, activation, device, embed_size
+        )
+
+    def forward(self, x: torch.Tensor):
+        return self.head(self.trunk(x))
 
     def distribution(self, output: torch.Tensor):
         return Normal(output, self.std)
 
 
-class VPGCategoricalPolicyModel(VPGPolicyModel):
+class VPGGaussianPolicyMLPHead(VPGModel):
     def __init__(
         self,
         env: gym.Env,
-        layers: List[Tuple[str, int, str]],
-        device: torch.torch.DeviceObjType,
+        trunk: VPGTrunkMLP,
+        num_layers: int,
+        layer_size: int,
+        activation: str,
+        device: torch.DeviceObjType,
+        std_logits: float = -0.5,
     ):
-        super(VPGCategoricalPolicyModel, self).__init__(env, layers, device)
+        assert isinstance(env.action_space, gym.spaces.Box)
 
+        layers = [("input", trunk.output_size)]
+        layers += [("linear", layer_size, activation)] * num_layers
+        layers += gaussian_output_layers(env, device)
+        super(VPGGaussianPolicyMLPHead, self).__init__(env, layers, device)
+
+        signal_count = env.action_space.shape[0]
+        self.std = torch.exp(
+            std_logits * torch.ones((signal_count,), dtype=torch.float32, device=device)
+        )
+
+        self.trunk = trunk
+
+    def forward(self, x: torch.Tensor):
+        return self.head(self.trunk(x))
+
+    def distribution(self, output: torch.Tensor):
+        return Normal(output, self.std)
+
+
+class VPGCategoricalPolicyMLP(VPGModel):
+    def __init__(
+        self,
+        env: gym.Env,
+        num_layers: int,
+        layer_size: int,
+        activation: str,
+        device: torch.DeviceObjType,
+        embed_size: int = 0,
+    ):
         assert isinstance(env.action_space, gym.spaces.Discrete)
 
-        output_layers = [("linear", env.action_space.n, "none")]
-        self.layers += output_layers
-        self.model = self.build_model(self.layers)
+        layers = [("input", layer_size), ("linear", env.action_space.n, "none")]
+        super(VPGCategoricalPolicyMLP, self).__init__(env, layers, device)
+
+        self.trunk = VPGTrunkMLP(
+            env, num_layers, layer_size, activation, device, embed_size
+        )
 
     def distribution(self, output: torch.Tensor):
         return Categorical(logits=output)
+
+    def forward(self, x: torch.Tensor):
+        return self.head(self.trunk(x))
+
+
+class VPGCategoricalPolicyMLPHead(VPGModel):
+    def __init__(
+        self,
+        env: gym.Env,
+        trunk: VPGTrunkMLP,
+        num_layers: int,
+        layer_size: int,
+        activation: str,
+        device: torch.DeviceObjType,
+    ):
+        assert isinstance(env.action_space, gym.spaces.Discrete)
+
+        layers = [("input", trunk.output_size)]
+        layers += [("linear", layer_size, activation)] * num_layers
+        layers += [("linear", env.action_space.n, "none")]
+        super(VPGCategoricalPolicyMLPHead, self).__init__(env, layers, device)
+
+        self.trunk = trunk
+
+    def distribution(self, output: torch.Tensor):
+        return Categorical(logits=output)
+
+    def forward(self, x: torch.Tensor):
+        return self.head(self.trunk(x))
+
+
+def make_models(env: gym.Env, device: torch.DeviceObjType, config: Dict[str, Any]):
+    if config["trunk_shared"]:
+        trunk = VPGTrunkMLP(
+            env,
+            config["trunk_num_layers"],
+            config["trunk_layer_size"],
+            config["trunk_activation"],
+            device,
+            config["trunk_embed_size"] if config["trunk_embed"] else 0,
+        )
+        if isinstance(env.action_space, gym.spaces.Box):
+            pi = VPGGaussianPolicyMLPHead(
+                env,
+                trunk,
+                config["pi_num_layers"],
+                config["pi_layer_size"],
+                config["pi_activation"],
+                device,
+                config["std_logits"],
+            )
+        elif isinstance(env.action_space, gym.spaces.Discrete):
+            pi = VPGCategoricalPolicyMLPHead(
+                env,
+                trunk,
+                config["pi_num_layers"],
+                config["pi_layer_size"],
+                config["pi_activation"],
+                device,
+            )
+        else:
+            raise NotImplementedError(
+                f"Action space type not yet supported: {type(env.action_space)}"
+            )
+        vf = VPGValueMLPHead(
+            env,
+            trunk,
+            config["vf_num_layers"],
+            config["vf_layer_size"],
+            config["vf_activation"],
+            device,
+        )
+    else:
+        if isinstance(env.action_space, gym.spaces.Box):
+            pi = VPGGaussianPolicyMLP(
+                env,
+                config["pi_num_layers"],
+                config["pi_layer_size"],
+                config["pi_activation"],
+                device,
+                config["pi_embed_size"] if config["pi_embed"] else 0,
+                config["std_logits"],
+            )
+        elif isinstance(env.action_space, gym.spaces.Discrete):
+            pi = VPGCategoricalPolicyMLP(
+                env,
+                config["pi_num_layers"],
+                config["pi_layer_size"],
+                config["pi_activation"],
+                device,
+                config["pi_embed_size"] if config["pi_embed"] else 0,
+            )
+        else:
+            raise NotImplementedError(
+                f"Action space type not yet supported: {type(env.action_space)}"
+            )
+        vf = VPGValueMLP(
+            env,
+            config["vf_num_layers"],
+            config["vf_layer_size"],
+            config["vf_activation"],
+            device,
+            config["vf_embed_size"] if config["vf_embed"] else 0,
+        )
+    return pi, vf
 
 
 def train(
@@ -203,27 +402,19 @@ def train(
     run_id: str,
     run_name: str,
 ):
+    config = utils.add_defaults(config)
 
     # Make the training reproducible.
     env.seed(config["seed"])
+    env.action_space.seed(config["seed"])
+    env.observation_space.seed(config["seed"])
     random.seed(config["seed"])
     np.random.seed(config["seed"])
     torch.random.manual_seed(config["seed"])
     torch.cuda.manual_seed_all(config["seed"])
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
 
-    if isinstance(env.action_space, gym.spaces.Box):
-        pi = VPGGaussianPolicyModel(
-            env, config["pi_layers"], config["std_logits"], device
-        )
-    elif isinstance(env.action_space, gym.spaces.Discrete):
-        pi = VPGCategoricalPolicyModel(env, config["pi_layers"], device)
-    else:
-        raise NotImplementedError(
-            f"Action space type not yet supported: {type(env.action_space)}"
-        )
-    vf = VPGValueModel(env, config["vf_layers"], device)
+    pi, vf = make_models(env, device, config)
 
     wandb.watch(pi)
     wandb.watch(vf)
@@ -239,6 +430,8 @@ def train(
     max_avg_eps_rew = float("-inf")
     max_performance = False
     epsilon = 1e-6
+    eta = config["entropy_eta"]
+
     obs_dtype = (
         torch.int64
         if isinstance(env.observation_space, gym.spaces.Discrete)
@@ -257,7 +450,13 @@ def train(
             obss = np.expand_dims(obss, axis=1)
         rets = torch.zeros(batch_size, dtype=torch.float32, device=device)
         advs = torch.zeros(batch_size, dtype=torch.float32, device=device)
-        as_ = torch.zeros(batch_size, dtype=torch.float32, device=device)
+        as_: torch.Tensor = torch.zeros(
+            [batch_size] + list(shape(env.action_space)),
+            dtype=torch.int64,
+            device=device,
+        )
+        if len(as_.shape) == 1:
+            as_ = as_.unsqueeze(1)
         rs = torch.zeros(batch_size, dtype=torch.float32, device=device)
         eps_vs, eps_rs = torch.zeros(
             batch_size, dtype=torch.float32, device=device
@@ -280,10 +479,10 @@ def train(
                 v = vf(obs_t)[0]
                 dist = pi.distribution(p)
                 a = dist.sample()
-                obs, r, done, _ = env.step(a.item())
+                obs, r, done, _ = env.step(a.cpu().numpy().tolist())
 
             eps_vs[eps_len - 1] = v
-            as_[i] = a
+            as_[i, :] = a.unsqueeze(0).squeeze()
             eps_rs[eps_len - 1] = r
             rs[i] = r
 
@@ -341,7 +540,7 @@ def train(
                 max_performance = False
 
         obs_b = torch.as_tensor(obss.squeeze(), dtype=obs_dtype, device=device)
-        a_b = as_
+        a_b = as_.squeeze()
         ret_b = rets
 
         adv_b = advs
@@ -353,7 +552,9 @@ def train(
         dist = pi.distribution(pi(obs_b))
         avg_entropy = dist.entropy().sum() / obs_b.shape[0]
         logp_b = dist.log_prob(a_b)
-        pi_loss = -(logp_b * adv_b).mean()
+        if len(logp_b.shape) > 1:
+            logp_b = torch.prod(logp_b, dim=1, keepdim=False)
+        pi_loss = -(logp_b * adv_b).mean() - eta * avg_entropy
         pi_loss.backward()
         pi_opt.step()
 

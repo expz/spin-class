@@ -1,11 +1,13 @@
 method: bayes
 metric:
   goal: maximize
-  name: avg_eps_rew
+  name: max_avg_eps_rew
 parameters:
+  env_args:
+    value:
+      is_slippery: false
   batch_size:
     values:
-    - 512
     - 1024
     - 2048
     - 4096
@@ -16,8 +18,6 @@ parameters:
     max: -0.00101  # 0.999
   lambda:
     value: 0.97
-  std_logits:
-    value: -0.5
   log_step:
     value: 8192
   pi_num_layers:
@@ -26,8 +26,8 @@ parameters:
     max: 6
   pi_layer_size:
     distribution: log_uniform
-    min: 2.77259  # 16
-    max: 4.85204  # 128
+    min: 4.15889  # 64
+    max: 6.93148  # 1024
   pi_activation:
     value: relu
   pi_lr:
@@ -38,14 +38,15 @@ parameters:
     value: 42
   steps:
     value: 163840
+  trunk_shared: false
   vf_num_layers:
     distribution: int_uniform
     min: 2
     max: 6
   vf_layer_size:
     distribution: log_uniform
-    min: 2.77259  # 16
-    max: 4.85204  # 128
+    min: 4.15889  # 64
+    max: 6.93148  # 1024
   vf_activation:
     value: relu
   vf_lr:
@@ -62,5 +63,5 @@ command:
   - python3
   - ${program}
   - "--env"
-  - "invertedpendulum"
+  - "frozenlake"
   - "${args}"

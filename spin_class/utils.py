@@ -2,6 +2,8 @@ import argparse
 
 from typing import Any, Dict
 
+import spin_class.config as conf
+
 
 def arg_parser():
     parser = argparse.ArgumentParser(
@@ -75,3 +77,10 @@ def update_config(config: Dict[str, Any], args: argparse.Namespace):
         config["vf_lr"] = args.vf_lr
     if args.vf_train_iters is not None:
         config["vf_train_iters"] = args.vf_train_iters
+
+
+def add_defaults(config: Dict[str, Any]):
+    defaults = conf.default_config["defaults"].copy()
+    for k, v in config.items():
+        defaults[k] = v
+    return defaults

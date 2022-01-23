@@ -29,7 +29,7 @@ def main():
     else:
         device = torch.device(args.device)
 
-    config = conf.default_config[args.env]
+    config = utils.add_defaults(conf.default_config[args.env])
     utils.update_config(config, args)
     if args.seed is not None:
         config["seed"] = args.seed
@@ -38,7 +38,19 @@ def main():
 
     run = wandb.init(project=f"vpg-{args.env}", config=config)
 
-    return vpg.train(env, wandb.config, device, run.id, run.name)
+    # So that we can use log_uniform distribution for sweeping, some of these
+    # might be floats. Convert them to ints.
+    run_config = utils.add_defaults(wandb.config)
+    for key in [
+        "trunk_num_layers",
+        "trunk_layer_size",
+        "vf_num_layers",
+        "vf_layer_size",
+        "pi_num_layers",
+        "pi_layer_size",
+    ]:
+        run_config[key] = int(run_config[key])
+    return vpg.train(env, run_config, device, run.id, run.name)
 
 
 if __name__ == "__main__":
