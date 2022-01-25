@@ -5,25 +5,27 @@ metric:
 parameters:
   env_args:
     value:
-      is_slippery: false
+      is_slippery: true
   batch_size:
     values:
     - 1024
     - 2048
     - 4096
-    - 8192
   gamma:
     distribution: log_uniform
     min: -0.10537  # 0.9
     max: -0.00101  # 0.999
   lambda:
     value: 0.97
+  entropy_eta:
+    min: 0.01
+    max: 0.05
   log_step:
-    value: 8192
+    value: 4096
   pi_num_layers:
     distribution: int_uniform
-    min: 2
-    max: 6
+    min: 1
+    max: 3
   pi_layer_size:
     distribution: log_uniform
     min: 4.15889  # 64
@@ -37,13 +39,27 @@ parameters:
   seed:
     value: 42
   steps:
-    value: 163840
+    value: 327680
   trunk_shared:
-    value: false
-  vf_num_layers:
+    value: true
+  trunk_embed:
+    value: true
+  trunk_embed_size:
+    value: 8
+  trunk_num_layers:
     distribution: int_uniform
     min: 2
-    max: 6
+    max: 5
+  trunk_layer_size:
+    distribution: log_uniform
+    min: 4.15889  # 64
+    max: 6.93148  # 1024
+  trunk_activation:
+    value: relu
+  vf_num_layers:
+    distribution: int_uniform
+    min: 1
+    max: 3
   vf_layer_size:
     distribution: log_uniform
     min: 4.15889  # 64
@@ -57,7 +73,7 @@ parameters:
   vf_train_iters:
     distribution: int_uniform
     min: 20
-    max: 320
+    max: 240
 program: spin_class/vpg_sweep.py
 command:
   - ${env}

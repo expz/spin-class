@@ -11,7 +11,6 @@ This code uses [Weights and Biases](https://wandb.ai/site) to track experiments.
 ### Prerequisites
 
 * Ubuntu 18.04 (presumably works on 20.04 and 22.04)
-* Nvidia GPU (TODO: remove this requirement)
 
 #### Install general prerequisites
 
@@ -105,9 +104,9 @@ wandb login
 
 ### Vanilla Policy Gradient
 
-This is implemented for CartPole-v0 and InvertedPendulum-v2.
+This is implemented for CartPole-v0, InvertedPendulum-v2 and FrozenLake-v1.
 
-__You must create projects `vpg-cartpole` and `vpg-invertedpendulum` in the Weights and Biases UI for this to work.__
+__You might need to create projects `vpg-cartpole`, `vpg-invertedpendulum` and `vpg-frozenlake` in the Weights and Biases UI for this to work.__
 
 #### Run reproducibility test
 
@@ -125,7 +124,16 @@ source venv/bin/activate
 python spin_class/vpg_reproducibility.py --env invertedpendulum
 ```
 
-for InvertedPendulum-v2.
+for InvertedPendulum-v2 or
+
+```bash
+source venv/bin/activate
+python spin_class/vpg_reproucibility.py --env frozenlake
+```
+
+for FrozenLake-v1 (slippery).
+
+__To use the GPU, add the `--device cuda:0` or `--device cuda_random` flag.__
 
 #### Run a hyperparameter search ("sweep")
 
@@ -138,3 +146,12 @@ source venv/bin/activate
 ```
 
 and then copy, paste and run the sweep command from the Weights and Biases UI.
+
+__To use the GPU, add__
+
+```yaml
+  - "--device"
+  - "cuda:random"
+```
+
+__before the `"${args}"` entry in the `command` section of the yaml.__
