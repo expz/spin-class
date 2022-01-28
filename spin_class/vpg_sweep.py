@@ -10,8 +10,6 @@ import spin_class.utils as utils
 
 def main():
     parser = utils.arg_parser()
-    parser.add_argument("--seed", default=0, type=int, help="random seed (default 0)")
-
     args, unknown = parser.parse_known_args()
 
     if unknown:
@@ -31,8 +29,6 @@ def main():
 
     config = utils.add_defaults(conf.default_config[args.env])
     utils.update_config(config, args)
-    if args.seed is not None:
-        config["seed"] = args.seed
 
     env = gym.make(config["env"])
 
