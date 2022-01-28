@@ -482,7 +482,7 @@ def train(
                 obs, r, done, _ = env.step(a.cpu().numpy().tolist())
 
             eps_vs[eps_len - 1] = v
-            as_[i, :] = a.unsqueeze(0).squeeze()
+            as_[i, :] = a
             eps_rs[eps_len - 1] = r
             rs[i] = r
 
