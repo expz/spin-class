@@ -1,0 +1,71 @@
+method: bayes
+metric:
+  goal: maximize
+  name: max_avg_eps_rew
+parameters:
+  batch_size:
+    values:
+    - 2000
+    - 4000
+    - 8000
+  gamma:
+    distribution: log_uniform
+    min: -0.10537  # 0.9
+    max: -0.00101  # 0.999
+  lambda:
+    value: 0.97
+  entropy_eta:
+    value: 0.0
+  std_logits:
+    min: -1.5
+    max: 0
+  log_step:
+    value: 8000
+  pi_num_layers:
+    distribution: int_uniform
+    min: 2
+    max: 4
+  pi_layer_size:
+    distribution: log_uniform
+    min: 2.77259  # 16
+    max: 6.93148  # 1024
+  pi_activation:
+    values:
+    - tanh
+  pi_lr:
+    distribution: log_uniform
+    min: -9.21034  # 0.0001
+    max: -0.91629  # 0.4
+  seed:
+    value: 42
+  steps:
+    value: 1000000
+  vf_num_layers:
+    distribution: int_uniform
+    min: 2
+    max: 4
+  vf_layer_size:
+    distribution: log_uniform
+    min: 2.77259  # 16
+    max: 6.93148  # 1024
+  vf_activation:
+    values:
+    - tanh
+  vf_lr:
+    distribution: log_uniform
+    min: -9.21034  # 0.0001
+    max: -0.91629  # 0.4
+  vf_train_iters:
+    distribution: int_uniform
+    min: 20
+    max: 320
+program: spin_class/vpg_sweep.py
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - "--env"
+  - "halfcheetah"
+  - "--device"
+  - "cuda:random"
+  - "${args}"
