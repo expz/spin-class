@@ -408,6 +408,18 @@ def train(
     run_id: str,
     run_name: str,
 ):
+    def save(step):
+        dt_str = datetime.now().strftime("%Y%m%dT%H%M%S")
+        state = {
+            "config": config,
+            "pi_state_dict": pi.state_dict(),
+            "vf_state_dict": vf.state_dict(),
+        }
+        torch.save(
+            state,
+            f"{model_dir}/{run_name}_{run_id}_{step}_{dt_str}.pth",
+        )
+
     config = utils.add_defaults(config)
 
     # Make the training reproducible.
@@ -429,6 +441,7 @@ def train(
     vf_opt = Adam(vf.parameters(), lr=config["vf_lr"])
 
     save_max_eps = config["save_max_eps"]
+    save_final = config["save_final"]
     gamma = config["gamma"]
     lam = config["lambda"]
     batch_size = config["batch_size"]
@@ -531,19 +544,12 @@ def train(
         if save_max_eps:
             if int(min_eps_len) == int(env.spec.max_episode_steps):
                 if not max_performance:
-                    dt_str = datetime.now().strftime("%Y%m%dT%H%M%S")
-                    state = {
-                        "config": config,
-                        "pi_state_dict": pi.state_dict(),
-                        "vf_state_dict": vf.state_dict(),
-                    }
-                    torch.save(
-                        state,
-                        f"{model_dir}/{run_name}_{run_id}_{step}_{dt_str}.pth",
-                    )
+                    save(step)
                 max_performance = True
             else:
                 max_performance = False
+        elif save_final and step >= config["steps"]:
+            save(step)
 
         obs_b = torch.as_tensor(obss.squeeze(), dtype=obs_dtype, device=device)
         a_b = as_.squeeze()
