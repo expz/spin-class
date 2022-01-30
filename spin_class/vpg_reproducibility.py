@@ -52,6 +52,8 @@ def main():
 
         vpg.train(env, config, device, run.id, run.name)
 
+        wandb.finish()
+
 
 if __name__ == "__main__":
     main()
