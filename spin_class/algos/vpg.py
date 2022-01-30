@@ -7,7 +7,7 @@ import os
 import random
 import torch
 from torch.distributions.categorical import Categorical
-from torch.distributions.normal import Normal
+from torch.distributions.multivariate_normal import MultivariateNormal
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
@@ -220,8 +220,11 @@ class VPGGaussianPolicyMLP(VPGModel):
         super(VPGGaussianPolicyMLP, self).__init__(env, output_layers, device)
 
         signal_count = env.action_space.shape[0]
-        self.std = torch.exp(
-            std_logits * torch.ones((signal_count,), dtype=torch.float32, device=device)
+        self.cov = torch.diag(
+            torch.exp(
+                std_logits
+                * torch.ones((signal_count,), dtype=torch.float32, device=device)
+            )
         )
 
         self.trunk = VPGTrunkMLP(
@@ -231,8 +234,8 @@ class VPGGaussianPolicyMLP(VPGModel):
     def forward(self, x: torch.Tensor):
         return self.head(self.trunk(x))
 
-    def distribution(self, output: torch.Tensor):
-        return Normal(output, self.std)
+    def distribution(self, output: torch.Tensor, c: float = 0.0):
+        return MultivariateNormal(output, self.cov * (1 - c))
 
 
 class VPGGaussianPolicyMLPHead(VPGModel):
@@ -254,8 +257,11 @@ class VPGGaussianPolicyMLPHead(VPGModel):
         super(VPGGaussianPolicyMLPHead, self).__init__(env, layers, device)
 
         signal_count = env.action_space.shape[0]
-        self.std = torch.exp(
-            std_logits * torch.ones((signal_count,), dtype=torch.float32, device=device)
+        self.cov = torch.diag(
+            torch.exp(
+                std_logits
+                * torch.ones((signal_count,), dtype=torch.float32, device=device)
+            )
         )
 
         self.trunk = trunk
@@ -263,8 +269,8 @@ class VPGGaussianPolicyMLPHead(VPGModel):
     def forward(self, x: torch.Tensor):
         return self.head(self.trunk(x))
 
-    def distribution(self, output: torch.Tensor):
-        return Normal(output, self.std)
+    def distribution(self, output: torch.Tensor, c: float = 0.0):
+        return MultivariateNormal(output, self.cov * (1 - c))
 
 
 class VPGCategoricalPolicyMLP(VPGModel):
@@ -286,7 +292,7 @@ class VPGCategoricalPolicyMLP(VPGModel):
             env, num_layers, layer_size, activation, device, embed_size
         )
 
-    def distribution(self, output: torch.Tensor):
+    def distribution(self, output: torch.Tensor, c: float = 0.0):
         return Categorical(logits=output)
 
     def forward(self, x: torch.Tensor):
@@ -312,7 +318,7 @@ class VPGCategoricalPolicyMLPHead(VPGModel):
 
         self.trunk = trunk
 
-    def distribution(self, output: torch.Tensor):
+    def distribution(self, output: torch.Tensor, c: float = 0.0):
         return Categorical(logits=output)
 
     def forward(self, x: torch.Tensor):
@@ -477,7 +483,7 @@ def train(
                 )
                 p = pi(obs_t)[0]
                 v = vf(obs_t)[0]
-                dist = pi.distribution(p)
+                dist = pi.distribution(p, k / config["steps"])
                 a = dist.sample()
                 obs, r, done, _ = env.step(a.cpu().numpy().tolist())
 
@@ -549,11 +555,10 @@ def train(
 
         pi_opt.zero_grad()
 
-        dist = pi.distribution(pi(obs_b))
+        dist = pi.distribution(pi(obs_b), k / config["steps"])
         avg_entropy = dist.entropy().sum() / obs_b.shape[0]
         logp_b = dist.log_prob(a_b)
-        if len(logp_b.shape) > 1:
-            logp_b = torch.prod(logp_b, dim=1, keepdim=False)
+        assert len(logp_b.shape) == 1
         pi_loss = -(logp_b * adv_b).mean() - eta * avg_entropy
         pi_loss.backward()
         pi_opt.step()
