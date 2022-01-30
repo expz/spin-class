@@ -495,20 +495,20 @@ def train(
             total_rew += r
 
             if done or i == batch_size - 1:
-                if done:
+                if done or not total_rews:
                     eps_lens.append(eps_len)
                     total_rews.append(total_rew)
                 ret = 0
                 for i in range(eps_len - 1, -1, -1):
                     ret = eps_rs[i] + gamma * ret
                     rets[ptr + i] = ret
-                adv = 0
-                for i in range(eps_len - 1, 0, -1):
+                adv = eps_rs[-1] - eps_vs[-1]
+                advs[ptr + eps_len - 1] = adv
+                for i in range(eps_len - 2, -1, -1):
                     adv = (
-                        eps_rs[i - 1] + gamma * eps_vs[i] - eps_vs[i - 1]
+                        eps_rs[i] + gamma * eps_vs[i + 1] - eps_vs[i]
                     ) + lam * gamma * adv
                     advs[ptr + i] = adv
-                advs[ptr + eps_len - 1] = eps_rs[-1] - eps_vs[-1]
                 ptr += eps_len
                 done = False
                 eps_len = 0
