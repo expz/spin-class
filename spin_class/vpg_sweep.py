@@ -1,4 +1,5 @@
 import gym
+import gym.wrappers.time_limit as time_limit
 import random
 import torch
 import wandb
@@ -30,7 +31,12 @@ def main():
     config = utils.add_defaults(conf.default_config[args.env])
     utils.update_config(config, args)
 
-    env = gym.make(config["env"])
+    kwargs = config["env_args"] if "env_args" in config else {}
+    env = gym.make(config["env"], **kwargs)
+    if config["max_episode_steps"] is not None:
+        env = time_limit.TimeLimit(
+            env.unwrapped, max_episode_steps=config["max_episode_steps"]
+        )
 
     run = wandb.init(project=f"vpg-{args.env}", config=config)
 

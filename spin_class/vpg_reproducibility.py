@@ -1,4 +1,5 @@
 import gym
+import gym.wrappers.time_limit as time_limit
 import json
 import random
 import spin_class.algos.vpg as vpg
@@ -38,6 +39,10 @@ def main():
 
     kwargs = config["env_args"] if "env_args" in config else {}
     env = gym.make(config["env"], **kwargs)
+    if config["max_episode_steps"] is not None:
+        env = time_limit.TimeLimit(
+            env.unwrapped, max_episode_steps=config["max_episode_steps"]
+        )
 
     start_seed = config["seed"]
     for seed in range(start_seed, start_seed + args.num_seeds):
