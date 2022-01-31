@@ -1,12 +1,10 @@
-import datetime
+from datetime import datetime
 import gym
 import gym.spaces
 import numpy as np
 import os
 import random
 import torch
-from torch.distributions.categorical import Categorical
-from torch.distributions.multivariate_normal import MultivariateNormal
 import torch.nn as nn
 from torch.optim import Adam
 from typing import Any, Dict, List, Tuple, Union
@@ -340,9 +338,8 @@ def train(
     run_id: str,
     run_name: str,
 ):
-    model_dir = f"models/vpg/{env.spec.id.lower()}"
-    os.makedirs(f"{model_dir}/pi", mode=0o755, exist_ok=True)
-    os.makedirs(f"{model_dir}/vf", mode=0o755, exist_ok=True)
+    model_dir = f"models/ddqn/{env.spec.id.lower()}"
+    os.makedirs(f"{model_dir}", mode=0o755, exist_ok=True)
 
     def save(q_net, step):
         dt_str = datetime.now().strftime("%Y%m%dT%H%M%S")
