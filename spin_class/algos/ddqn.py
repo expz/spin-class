@@ -161,7 +161,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         # keep self.p / p_sum from summing to exactly 1.0.
         p_sum = self.p.sum()
         indices = np.random.choice(self.size, size=batch_size, p=self.p / p_sum)
-        max_w = 1 / (self.count * self.min_p / p_sum)
+        max_w = 1 / max(self.count * self.min_p / p_sum, 1e-6)
         return SampleBatch(
             self.state[indices],
             self.action[indices],
