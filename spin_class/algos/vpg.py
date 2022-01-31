@@ -235,7 +235,7 @@ class VPGGaussianPolicyMLP(VPGModel):
         return self.head(self.trunk(x))
 
     def distribution(self, output: torch.Tensor, c: float = 0.0):
-        return MultivariateNormal(output, self.cov * (1 - c))
+        return MultivariateNormal(output, self.cov * np.exp(-3 * c))
 
 
 class VPGGaussianPolicyMLPHead(VPGModel):
@@ -270,7 +270,7 @@ class VPGGaussianPolicyMLPHead(VPGModel):
         return self.head(self.trunk(x))
 
     def distribution(self, output: torch.Tensor, c: float = 0.0):
-        return MultivariateNormal(output, self.cov * (1 - c))
+        return MultivariateNormal(output, self.cov * np.exp(-3 * c))
 
 
 class VPGCategoricalPolicyMLP(VPGModel):
@@ -325,7 +325,9 @@ class VPGCategoricalPolicyMLPHead(VPGModel):
         return self.head(self.trunk(x))
 
 
-def make_models(env: gym.Env, device: torch.DeviceObjType, config: Dict[str, Any]):
+def make_models(
+    env: gym.Env, device: torch.DeviceObjType, config: Dict[str, Any]
+) -> Tuple[VPGModel, VPGModel]:
     if config["trunk_shared"]:
         trunk = VPGTrunkMLP(
             env,
@@ -408,7 +410,11 @@ def train(
     run_id: str,
     run_name: str,
 ):
-    def save(step):
+    model_dir = f"models/vpg/{env.spec.id.lower()}"
+    os.makedirs(f"{model_dir}/pi", mode=0o755, exist_ok=True)
+    os.makedirs(f"{model_dir}/vf", mode=0o755, exist_ok=True)
+
+    def save(pi, vf, step):
         dt_str = datetime.now().strftime("%Y%m%dT%H%M%S")
         state = {
             "config": config,
@@ -420,7 +426,7 @@ def train(
             f"{model_dir}/{run_name}_{run_id}_{step}_{dt_str}.pth",
         )
 
-    config = utils.add_defaults(config)
+    config = utils.add_defaults("vpg", config)
 
     # Make the training reproducible.
     env.seed(config["seed"])
@@ -456,10 +462,6 @@ def train(
         if isinstance(env.observation_space, gym.spaces.Discrete)
         else torch.float32
     )
-
-    model_dir = f"models/vpg/{env.spec.id.lower()}"
-    os.makedirs(f"{model_dir}/pi", mode=0o755, exist_ok=True)
-    os.makedirs(f"{model_dir}/vf", mode=0o755, exist_ok=True)
 
     for k in range(0, config["steps"], batch_size):
         done = False
@@ -544,12 +546,12 @@ def train(
         if save_max_eps:
             if int(min_eps_len) == int(env.spec.max_episode_steps):
                 if not max_performance:
-                    save(step)
+                    save(pi, vf, step)
                 max_performance = True
             else:
                 max_performance = False
         elif save_final and step >= config["steps"]:
-            save(step)
+            save(pi, vf, step)
 
         obs_b = torch.as_tensor(obss.squeeze(), dtype=obs_dtype, device=device)
         a_b = as_.squeeze()

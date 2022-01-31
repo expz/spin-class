@@ -2,10 +2,11 @@ import gym
 import gym.wrappers.time_limit as time_limit
 import json
 import random
-import spin_class.algos.vpg as vpg
 import torch
 import wandb
 
+import spin_class.algos.vpg as vpg
+import spin_class.algos.ddqn as ddqn
 import spin_class.utils as utils
 import spin_class.config as conf
 
@@ -21,9 +22,10 @@ def main():
     if unknown:
         print("WARNING: Unknown arguments:", unknown)
 
-    if args.env not in conf.default_config:
+    if args.env not in conf.default_config[args.algo]:
         raise NotImplementedError(
-            "The supplied environment is not currently supported:", args.env
+            f"The supplied environment is not currently supported for algorithm {args.algo}:",
+            args.env,
         )
 
     if args.device == "cuda:random":
@@ -33,7 +35,8 @@ def main():
     else:
         device = torch.device(args.device)
 
-    config = conf.default_config[args.env]
+    config = conf.default_config[args.algo][args.env]
+    config = utils.add_defaults(args.algo, config)
     utils.update_config(config, args)
     print(json.dumps(config, indent=2))
 
@@ -50,12 +53,15 @@ def main():
         config["seed"] = seed
 
         run = wandb.init(
-            project=f"vpg-{args.env}",
+            project=f"{args.algo}-{args.env}",
             config=config,
             name=f"reproducibility-{seed}",
         )
 
-        vpg.train(env, config, device, run.id, run.name)
+        if args.algo == "vpg":
+            vpg.train(env, config, device, run.id, run.name)
+        elif args.algo == "ddqn":
+            ddqn.train(env, config, device, run.id, run.name)
 
         wandb.finish()
 

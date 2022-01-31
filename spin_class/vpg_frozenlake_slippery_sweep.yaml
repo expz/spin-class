@@ -74,7 +74,7 @@ parameters:
     distribution: int_uniform
     min: 20
     max: 240
-program: spin_class/vpg_sweep.py
+program: spin_class/sweep.py
 command:
   - ${env}
   - python3

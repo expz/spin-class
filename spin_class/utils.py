@@ -9,6 +9,14 @@ def arg_parser():
     parser = argparse.ArgumentParser(
         description="check how dependent the performance of a model is on the random seed"
     )
+    parser.add_argument(
+        "--algo",
+        default="vpg",
+        const="vpg",
+        nargs="?",
+        choices=["vpg", "ddqn"],
+        help="algorithm (default: %(default)s)",
+    )
     parser.add_argument("--batch_size", default=None, type=int, help="batch size")
     parser.add_argument(
         "--device",
@@ -130,8 +138,8 @@ def update_config(config: Dict[str, Any], args: argparse.Namespace):
         config["vf_train_iters"] = args.vf_train_iters
 
 
-def add_defaults(config: Dict[str, Any]):
-    defaults = conf.default_config["defaults"].copy()
+def add_defaults(algo: str, config: Dict[str, Any]):
+    defaults = conf.default_config[algo]["defaults"].copy()
     for k, v in config.items():
         defaults[k] = v
     return defaults

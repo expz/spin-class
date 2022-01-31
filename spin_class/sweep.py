@@ -4,6 +4,7 @@ import random
 import torch
 import wandb
 
+import spin_class.algos.ddqn as ddqn
 import spin_class.algos.vpg as vpg
 import spin_class.config as conf
 import spin_class.utils as utils
@@ -16,9 +17,10 @@ def main():
     if unknown:
         print("WARNING: Unknown arguments:", unknown)
 
-    if args.env not in conf.default_config:
+    if args.env not in conf.default_config[args.algo]:
         raise NotImplementedError(
-            "The supplied environment is not currently supported:", args.env
+            f"The supplied environment is not currently supported for algorithm {args.algo}:",
+            args.env,
         )
 
     if args.device == "cuda:random":
@@ -28,7 +30,8 @@ def main():
     else:
         device = torch.device(args.device)
 
-    config = utils.add_defaults(conf.default_config[args.env])
+    config = conf.default_config[args.algo][args.env]
+    config = utils.add_defaults(args.algo, config)
     utils.update_config(config, args)
 
     kwargs = config["env_args"] if "env_args" in config else {}
@@ -38,11 +41,11 @@ def main():
             env.unwrapped, max_episode_steps=config["max_episode_steps"]
         )
 
-    run = wandb.init(project=f"vpg-{args.env}", config=config)
+    run = wandb.init(project=f"{args.algo}-{args.env}", config=config)
 
     # So that we can use log_uniform distribution for sweeping, some of these
     # might be floats. Convert them to ints.
-    run_config = utils.add_defaults(wandb.config)
+    run_config = utils.add_defaults(args.algo, wandb.config)
     for key in [
         "trunk_num_layers",
         "trunk_layer_size",
@@ -52,7 +55,10 @@ def main():
         "pi_layer_size",
     ]:
         run_config[key] = int(run_config[key])
-    return vpg.train(env, run_config, device, run.id, run.name)
+    if args.algo == "vpg":
+        return vpg.train(env, run_config, device, run.id, run.name)
+    elif args.algo == "ddqn":
+        return ddqn.train(env, run_config, device, run.id, run.name)
 
 
 if __name__ == "__main__":
