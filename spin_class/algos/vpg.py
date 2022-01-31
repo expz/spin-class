@@ -411,8 +411,7 @@ def train(
     run_name: str,
 ):
     model_dir = f"models/vpg/{env.spec.id.lower()}"
-    os.makedirs(f"{model_dir}/pi", mode=0o755, exist_ok=True)
-    os.makedirs(f"{model_dir}/vf", mode=0o755, exist_ok=True)
+    os.makedirs(f"{model_dir}", mode=0o755, exist_ok=True)
 
     def save(pi, vf, step):
         dt_str = datetime.now().strftime("%Y%m%dT%H%M%S")
