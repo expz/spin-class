@@ -496,8 +496,9 @@ def train(
                     [
                         f"steps: {step}",
                         f"avg total rew: {avg_eps_rew:.4f}",
+                        f"max total rew: {max_eps_rew:.2f}",
+                        f"min total rew: {min_eps_rew:.2f}",
                         f"avg eps length: {avg_eps_len:.2f}",
-                        f"min eps length: {min_eps_len}",
                         f"q loss: {avg_q_loss:.6f}",
                     ]
                 )
