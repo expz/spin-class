@@ -104,9 +104,9 @@ wandb login
 
 ### Vanilla Policy Gradient
 
-This is implemented for CartPole-v0, InvertedPendulum-v2 and FrozenLake-v1.
+This is implemented for CartPole-v0, InvertedPendulum-v2, FrozenLake-v1 and HalfCheetah-v2.
 
-__You might need to create projects `vpg-cartpole`, `vpg-invertedpendulum` and `vpg-frozenlake` in the Weights and Biases UI for this to work.__
+__This will create projects `vpg-cartpole`, `vpg-invertedpendulum`, `vpg-frozenlake` and `vpg-halfcheetah` in the Weights and Biases UI.__
 
 #### Run reproducibility test
 
@@ -114,24 +114,33 @@ This runs the same algorithm with the same settings with different random seeds 
 
 ```bash
 source venv/bin/activate
-python spin_class/vpg_reproducibility.py --env cartpole
+python spin_class/reproducibility.py --algo vpg --env cartpole
 ```
 
 for CartPole-v0 or
 
 ```bash
 source venv/bin/activate
-python spin_class/vpg_reproducibility.py --env invertedpendulum
+python spin_class/reproducibility.py --algo vpg --env invertedpendulum
 ```
 
 for InvertedPendulum-v2 or
 
 ```bash
 source venv/bin/activate
-python spin_class/vpg_reproucibility.py --env frozenlake
+python spin_class/reproducibility.py --algo vpg --env frozenlake
 ```
 
-for FrozenLake-v1 (slippery).
+for FrozenLake-v1 (slippery). Use `--env frozenlake-nonslippery` for the non-slippery version. Use
+
+```bash
+source venv/bin/activate
+python spin_class/reproducibility.py --algo vpg --env halfcheetah
+```
+
+for HalfCheetah-v2. VPG does not completely solve the HalfCheetah environment, but it should be able to achieve consistent forward motion.
+
+If you would like to just run for one seed, add the `--num-seeds 1` flag.
 
 __To use the GPU, add the `--device cuda:0` or `--device cuda_random` flag.__
 
@@ -155,3 +164,7 @@ __To use the GPU, add__
 ```
 
 __before the `"${args}"` entry in the `command` section of the yaml.__
+
+### Double Deep Q-Learning (DDQN)
+
+This is implemented for CartPole-v0 and FrozenLake-v2 (slippery and non-slippery). To use it, use the `--algo ddqn` flag.

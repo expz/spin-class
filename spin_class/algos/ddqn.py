@@ -6,6 +6,7 @@ import os
 import random
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.optim import Adam
 from typing import Any, Dict, List, Tuple, Union
 import wandb
@@ -223,31 +224,6 @@ def build_model(
     return nn.Sequential(*layers).to(device)
 
 
-def gaussian_output_layers(env: gym.Env, device: torch.DeviceObjType):
-    signal_count = env.action_space.shape[0]
-
-    output_layers = [("linear", signal_count, "tanh")]
-
-    # TOOD: Support infinite sized boxes.
-    signal_scale = torch.as_tensor(
-        (env.action_space.high - env.action_space.low) / 2.0,
-        dtype=torch.float32,
-        device=device,
-    )
-    if not torch.all(torch.isclose(signal_scale, torch.ones_like(signal_scale))):
-        output_layers.append(("scaling", signal_scale))
-
-    if not np.all(
-        np.isclose(env.action_space.high, -env.action_space.low, equal_nan=True)
-    ):
-        # TODO: add offset layer.
-        raise NotImplementedError(
-            "Box ranges which are not centered at 0 are not yet implemented."
-        )
-
-    return output_layers
-
-
 class ScaleLayer1d(nn.Module):
     def __init__(self, scale: torch.Tensor):
         super(ScaleLayer1d, self).__init__()
@@ -304,11 +280,11 @@ class DQNMLP(DQNModel):
             shape = env.observation_space.sample().shape[0]
             layers = [("input", shape)]
         elif isinstance(env.observation_space, gym.spaces.Discrete):
+            layers = [("input", 1)]
             if embed_size > 0:
-                layers = [("embed", env.observation_space.n, embed_size)]
+                layers += [("embed", env.observation_space.n, embed_size)]
             else:
-                layers = [("onehot", env.observation_space.n)]
-            layers += [("input", 1)] + layers
+                layers += [("onehot", env.observation_space.n)]
         layers += [("linear", layer_size, activation)] * num_layers
 
         layers += [("linear", env.action_space.n, "none")]
@@ -381,6 +357,7 @@ def train(
     avg_eps_len = 0
     max_avg_eps_rew = float("-inf")
     eps_sched_len = config["eps_sched_len"]
+    min_eps = config["eps_sched_final"]
     learning_starts = config["learning_starts"]
     training_freq = config["training_freq"]
     target_update_freq = config["target_update_freq"]
@@ -391,7 +368,6 @@ def train(
         buffer = UniformReplayBuffer(config["buffer_size"], env)
 
     def eps(step: int):
-        min_eps = 0.1
         return max(min_eps, min_eps + (1.0 - min_eps) * (1 - step / eps_sched_len))
 
     obs_dtype = (
