@@ -220,8 +220,8 @@ default_config = {
         "defaults": {
             "env": "CartPole-v0",
             "env_args": {},
-            "save_max_eps": True,
-            "save_final": True,
+            "save_max_eps": False,
+            "save_final": False,
             "buffer_size": 100000,
             "buffer_type": "uniform",
             "gamma": 0.995,
@@ -248,11 +248,23 @@ default_config = {
         },
         "cartpole": {
             "env": "CartPole-v0",
-            # "batch_size": 2,
-            # "min_return": -2,
-            # "max_return": 2,
-            # "distribution_resolution": 9,
-            # "learning_starts": 4,
+            "save_max_eps": True,
+            "save_final": True,
+        },
+        "frozenlake-nonslippery": {
+            "env": "FrozenLake-v1",
+            "env_args": {
+                "is_slippery": False,
+            },
+            "save_max_eps": True,
+            "save_final": True,
+        },
+        "frozenlake": {
+            "env": "FrozenLake-v1",
+            "env_args": {
+                "is_slippery": True,
+            },
+            "save_final": True,
         },
     },
 }

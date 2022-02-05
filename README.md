@@ -167,4 +167,8 @@ __before the `"${args}"` entry in the `command` section of the yaml.__
 
 ### Double Deep Q-Learning (DDQN)
 
-This is implemented for CartPole-v0 and FrozenLake-v2 (slippery and non-slippery). To use it, use the `--algo ddqn` flag.
+This is implemented for CartPole-v0 and FrozenLake-v1 (slippery and non-slippery). To use it, use the `--algo ddqn` flag.
+
+### Distributional Q-Learning (C51)
+
+This is implemented for CartPole-v0 and Frozenlake-v1 (slippery and non-slippery). To use it, use the `--algo c51` flag.
