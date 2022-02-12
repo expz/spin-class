@@ -6,6 +6,7 @@ import torch
 import wandb
 
 import spin_class.algos.c51 as c51
+import spin_class.algos.ddpg as ddpg
 import spin_class.algos.ddqn as ddqn
 import spin_class.algos.vpg as vpg
 import spin_class.utils as utils
@@ -65,6 +66,8 @@ def main():
             ddqn.train(env, config, device, run.id, run.name)
         elif args.algo == "c51":
             c51.train(env, config, device, run.id, run.name)
+        elif args.algo == "ddpg":
+            ddpg.train(env, config, device, run.id, run.name)
 
         wandb.finish()
 
