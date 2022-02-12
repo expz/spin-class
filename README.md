@@ -172,3 +172,7 @@ This is implemented for CartPole-v0 and FrozenLake-v1 (slippery and non-slippery
 ### Distributional Q-Learning (C51)
 
 This is implemented for CartPole-v0 and Frozenlake-v1 (slippery and non-slippery). To use it, use the `--algo c51` flag.
+
+### Deep Deterministic Policy Gradient (DDPG)
+
+This is implemented for InvertedPendulum-v2 and HalfCheetah-v2. To use it, use the `--algo ddpg` flag.
