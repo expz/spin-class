@@ -176,3 +176,7 @@ This is implemented for CartPole-v0 and Frozenlake-v1 (slippery and non-slippery
 ### Deep Deterministic Policy Gradient (DDPG)
 
 This is implemented for InvertedPendulum-v2 and HalfCheetah-v2. To use it, use the `--algo ddpg` flag.
+
+### Twin Delayed Deep Deterministic Policy Gradient (TD3)
+
+This is implemented for InvertedPendulum-v2 and HalfCheetah-v2. To use it, use the `--algo td3` flag.

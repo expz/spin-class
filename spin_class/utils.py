@@ -14,7 +14,7 @@ def arg_parser():
         default="vpg",
         const="vpg",
         nargs="?",
-        choices=["vpg", "ddqn", "c51", "ddpg"],
+        choices=["vpg", "ddqn", "c51", "ddpg", "td3"],
         help="algorithm (default: %(default)s)",
     )
     parser.add_argument("--batch_size", default=None, type=int, help="batch size")
