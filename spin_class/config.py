@@ -281,6 +281,7 @@ default_config = {
             "pi_layer_size": 64,
             "pi_activation": "relu",
             "pi_std_logits": -0.5,
+            "pi_std_decay": True,
             "q_num_layers": 2,
             "q_layer_size": 64,
             "q_activation": "relu",

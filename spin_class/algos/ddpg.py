@@ -254,6 +254,7 @@ class DDPGActorMLP(DDPGModel):
         activation: str,
         device: torch.DeviceObjType,
         std_logits: float = -0.5,
+        std_decay: bool = False,
     ):
         assert isinstance(env.observation_space, gym.spaces.Box)
         assert isinstance(env.action_space, gym.spaces.Box)
@@ -271,12 +272,14 @@ class DDPGActorMLP(DDPGModel):
                 * torch.ones((signal_count,), dtype=torch.float32, device=device)
             )
         )
+        self.std_decay = std_decay
 
     def forward(self, x: torch.Tensor):
         return self.head(x)
 
     def distribution(self, output: torch.Tensor, c: float = 0.0):
-        return MultivariateNormal(output, self.cov * np.exp(-3 * c))
+        k = np.exp(-3 * c) if self.std_decay else 1
+        return MultivariateNormal(output, self.cov * k)
 
 
 class DDPGCriticMLP(DDPGModel):
@@ -313,6 +316,7 @@ def make_models(
             config["pi_activation"],
             device,
             config["pi_std_logits"],
+            config["pi_std_decay"],
         ),
         DDPGCriticMLP(
             env,
