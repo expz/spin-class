@@ -7,6 +7,7 @@ import wandb
 import spin_class.algos.c51 as c51
 import spin_class.algos.ddpg as ddpg
 import spin_class.algos.ddqn as ddqn
+import spin_class.algos.ppo as ppo
 import spin_class.algos.td3 as td3
 import spin_class.algos.vpg as vpg
 import spin_class.config as conf
@@ -67,6 +68,8 @@ def main():
     elif args.algo == "ddpg":
         return ddpg.train(env, run_config, device, run.id, run.name)
     elif args.algo == "td3":
+        return td3.train(env, run_config, device, run.id, run.name)
+    elif args.algo == "ppo":
         return td3.train(env, run_config, device, run.id, run.name)
 
 
