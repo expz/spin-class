@@ -477,8 +477,8 @@ def train(
         obs = torch.as_tensor(obss.squeeze(), dtype=obs_dtype, device=device)
         a = as_.squeeze()
         ret = rets
-        adv = advs
-        std, mean = adv.std(dim=0), adv.mean()
+        std, mean = advs.std(dim=0), advs.mean()
+        adv = (advs - mean) / std
 
         pi_k = clone(pi)
 
@@ -499,7 +499,6 @@ def train(
                 dist_k = pi.distribution(pi_k(obs_b), step / total_steps)
                 p_k_b = F.softmax(dist_k.log_prob(a_b), dim=-1)
                 assert len(p_k_b.shape) == 1
-                avg_entropy = dist.entropy().sum() / obs_b.shape[0]
                 g = torch.where(
                     adv_b >= 0, (1 + epsilon) * adv_b, (1 - epsilon) * adv_b
                 )
@@ -510,6 +509,7 @@ def train(
                 vf_loss = ((v_b - ret_b) ** 2).mean()
 
                 # Calculate entropy loss
+                avg_entropy = dist.entropy().sum() / obs_b.shape[0]
                 entropy_loss = -avg_entropy
 
                 # Calculate total loss

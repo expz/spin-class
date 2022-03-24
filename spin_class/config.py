@@ -412,7 +412,7 @@ default_config = {
             "batch_size": 256,
             "epochs": 10,
             "iter_steps": 2048,
-            "total_steps": 163840,
+            "total_steps": 108544,
             "log_step": 8192,
         },
     },
