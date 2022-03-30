@@ -494,10 +494,12 @@ def train(
 
                 # Calculate pi loss
                 dist = pi.distribution(pi(obs_b), step / total_steps)
-                p_b = F.softmax(dist.log_prob(a_b), dim=-1)
+                p_b = dist.probs.gather(-1, a_b.unsqueeze(-1))
+                p_b = p_b.squeeze()
                 assert len(p_b.shape) == 1
                 dist_k = pi.distribution(pi_k(obs_b), step / total_steps)
-                p_k_b = F.softmax(dist_k.log_prob(a_b), dim=-1)
+                p_k_b = dist_k.probs.gather(-1, a_b.unsqueeze(-1))
+                p_k_b = p_k_b.squeeze()
                 assert len(p_k_b.shape) == 1
                 g = torch.where(
                     adv_b >= 0, (1 + epsilon) * adv_b, (1 - epsilon) * adv_b
