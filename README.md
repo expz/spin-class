@@ -44,10 +44,9 @@ sudo apt-get install -y \
     software-properties-common \
     virtualenv \
     wget \
-    xpra \
-    xserver-org-dev
+    xpra
 
-sudo wget -o /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-sci-artifacts/manual-builds/patchelf_0.9_amd64.elf \
+sudo wget -O /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-sci-artifacts/manual-builds/patchelf_0.9_amd64.elf \
   && sudo chmod a+x /usr/local/bin/patchelf
 ```
 
@@ -56,13 +55,13 @@ sudo wget -o /usr/local/bin/patchelf https://s3-us-west-2.amazonaws.com/openai-s
 ```bash
 mkdir -p ~/.mujoco
 
-wget -o ~/.mujoco/mjkey.txt https://roboti.us/file/mjkey.txt
-wget -o ~/.mujoco/mjpro150_linux.zip https://roboti.us/download/mjpro150_linux.zip
+wget -O ~/.mujoco/mjkey.txt https://roboti.us/file/mjkey.txt
+wget -O ~/.mujoco/mjpro150_linux.zip https://roboti.us/download/mjpro150_linux.zip
 cd ~/.mujoco && unzip ./mjpro150_linux.zip
 
 # libglewosmesa.so from Mujoco 1.5 is incompatible with Python >= 3.7,
  # so get a new version of the library from Mujoco 2.1.0
-wget -o ~/.mujoco/mujoco210-linux-x86_64.tar.gz https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz
+wget -O ~/.mujoco/mujoco210-linux-x86_64.tar.gz https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz
 cd ~/.mujoco && tar -xvzf ./mujoco210-linux-x86_64.tar.gz
 cd ~/.mujoco/mjpro150/bin \
   && mv libglewosmesa.so libglewosmesa.old.so \
@@ -73,8 +72,8 @@ cd ~/.mujoco/mjpro150/bin \
 Set the library path and update bash configuration to automatically load library path.
 
 ```bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/$USER/.mujoco/mjpro150:/usr/lib/nvidia
-echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/$USER/.mujoco/mjpro150:/usr/lib/nvidia' >> ~/.bashrc
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mjpro150/bin:/usr/lib/nvidia
+echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mjpro150/bin:/usr/lib/nvidia' >> ~/.bashrc
 ```
 
 ### Set up virtual environment
